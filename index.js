@@ -5,6 +5,8 @@ const cors = require("cors");
 require("dotenv").config();
 // const jwt = require("jsonwebtoken");
 // const cookieParser = require("cookie-parser");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 //CONFIG
@@ -105,7 +107,7 @@ async function run() {
           .sort({ responseCount: -1 }) // Sort by responseCount in descending order
           .limit(6) // Limit to 6 surveys
           .toArray(); // Convert to array
-    
+
         res.send(result);
       } catch (error) {
         console.error("Error fetching most voted surveys:", error);
@@ -202,37 +204,34 @@ async function run() {
       }
       const filter = { _id: new ObjectId(id) };
       const status = req.body.status;
-    
+
       try {
         const updateDoc = {
           $set: { status },
         };
-    
+
         const result = await surveyCollection.updateOne(filter, updateDoc);
-    
+
         console.log("Update result:", result);
-    
+
         if (result.modifiedCount === 1) {
           res.status(200).send("Survey status updated successfully");
         } else {
-          res.status(404).send("No documents matched the query. Updated 0 documents.");
+          res
+            .status(404)
+            .send("No documents matched the query. Updated 0 documents.");
         }
       } catch (error) {
         console.error("Error updating survey status:", error);
         res.status(500).send("Error updating survey status");
       }
     });
-    
-
-    
-
 
     //------------------------------------ADMIN END
 
     //------------------------------------USER
 
     // POST THE USER RESPONSE TO THE DB FOR THAT SURVEY
- 
 
     app.post("/user-response", async (req, res) => {
       const userResponseData = req.body;
@@ -260,9 +259,8 @@ async function run() {
       }
     });
 
-
-     // GET ALL THE responses FOR USER FROM DB FOR MY RECOMMENDATION PAGE
-     app.get("/my-responses/:email", async (req, res) => {
+    // GET ALL THE responses FOR USER FROM DB FOR MY RECOMMENDATION PAGE
+    app.get("/my-responses/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const result = await usersResponseCollection.find(query).toArray();
@@ -390,6 +388,84 @@ async function run() {
         res
           .status(500)
           .send({ message: "Error updating query. Please try again later." });
+      }
+    });
+
+    // ----------------------------------STRIPE PAYMENT
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const priceInCent = parseFloat(price) * 100;
+      if (!price || priceInCent < 1)
+        return res.status(400).send("Invalid price");
+
+      try {
+        const { client_secret } = await stripe.paymentIntents.create({
+          amount: priceInCent,
+          currency: "usd",
+          automatic_payment_methods: {
+            enabled: true,
+          },
+        });
+        res.send({ clientSecret: client_secret });
+      } catch (error) {
+        console.error("Error creating payment intent:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
+    app.put("/payment/pro-user", async (req, res) => {
+      const user = req.body;
+      const query = { email: user?.email };
+
+      const isExist = await usersCollection.findOne(query);
+      if (isExist) {
+        if (user.status === "Requested") {
+          const result = await usersCollection.updateOne(query, {
+            $set: { status: user?.status },
+          });
+          return res.send(result);
+        } else {
+          return res.send(isExist);
+        }
+      } else {
+        const options = { upsert: true };
+        const updateDoc = {
+          $set: {
+            ...user,
+            timestamp: Date.now(),
+          },
+        };
+        const result = await usersCollection.updateOne(
+          query,
+          updateDoc,
+          options
+        );
+        res.send(result);
+      }
+    });
+
+    app.patch("/payment/pro-user/update/:email", async (req, res) => {
+      const email = req.params.email;
+      const { role, status } = req.body;
+      const query = { email };
+
+      try {
+        const updateDoc = {
+          $set: { role, status, timestamp: Date.now() },
+        };
+
+        const result = await usersCollection.updateOne(query, updateDoc);
+
+        if (result.modifiedCount === 1) {
+          res.status(200).send("User role updated successfully");
+        } else {
+          res
+            .status(404)
+            .send("No documents matched the query. Updated 0 documents.");
+        }
+      } catch (error) {
+        console.error("Error updating user role:", error);
+        res.status(500).send("Error updating user role");
       }
     });
 
