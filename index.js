@@ -87,23 +87,30 @@ async function run() {
     // DATA
     // ---------------------------------------------------HOME STARTS
 
-    // GET ALL THE POSTED SURVEYS FOR HOME PAGE LATEST SURVEYS
+    // GET ALL THE PUBLISHED STATUS POSTED SURVEYS FOR HOME PAGE LATEST SURVEYS
     app.get("/recent-surveys", async (req, res) => {
       try {
-        const result = await surveyCollection.find().toArray();
+        const query = { status: "publish" };
+        const result = await surveyCollection.find(query).toArray();
+        console.log("Fetched Surveys:", result);  // Log fetched data
         const reversedResult = result.reverse();
+        console.log(reversedResult);
+
         res.send(reversedResult);
       } catch (error) {
         console.error("Error fetching recent surveys:", error);
         res.status(500).send("Internal Server Error");
       }
     });
+    
 
     // GET THE MOST VOTED/REPONSES SURVEYS FROM DB
     app.get("/most-voted-surveys", async (req, res) => {
       try {
+        const query = { status: "publish" };
+
         const result = await surveyCollection
-          .find()
+          .find(query)
           .sort({ responseCount: -1 }) // Sort by responseCount in descending order
           .limit(6) // Limit to 6 surveys
           .toArray(); // Convert to array
@@ -115,6 +122,46 @@ async function run() {
       }
     });
     // ---------------------------------------------------HOME ENDS
+
+
+
+    // ---------------------------------------------------SURVEYS PAGE STARTS
+    app.get("/all-surveys", async (req, res) => {
+      try {
+        const { category, sort } = req.query;
+        
+        // Base query to find published surveys
+        let query = { status: "publish" };
+        
+        // If category filter is provided, add it to the query
+        if (category) {
+          query.category = category;
+        }
+        
+        // Fetch surveys that match the query
+        let result = await surveyCollection.find(query).toArray();
+        
+        // Sort by response count if specified
+        if (sort === "votes") {
+          result.sort((a, b) => b.responseCount - a.responseCount);
+        }
+    
+        // Reverse the results to get the latest surveys first
+        const reversedResult = result.reverse();
+        
+        console.log("Fetched Surveys:", reversedResult);
+        res.send(reversedResult);
+        
+      } catch (error) {
+        console.error("Error fetching recent surveys:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+    
+    
+
+    // ---------------------------------------------------SURVEYS PAGE ENDS
+
 
     // -------------------------------------ADMIN
 
