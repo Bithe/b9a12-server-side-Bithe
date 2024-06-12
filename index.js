@@ -65,7 +65,6 @@ async function run() {
       .db("zendeskDb")
       .collection("usersResponseCollection");
 
-
     const reportsCollection = client
       .db("zendeskDb")
       .collection("reportsCollection");
@@ -305,38 +304,42 @@ async function run() {
     // });
     app.post("/user-response", async (req, res) => {
       const userResponseData = req.body;
-    
+
       try {
         // Insert the user response data into the database
-        const result = await usersResponseCollection.insertOne(userResponseData);
-    
+        const result = await usersResponseCollection.insertOne(
+          userResponseData
+        );
+
         // Construct the update operations based on the user's response
         const updateOperations = { $inc: { responseCount: 1 } };
-        if (userResponseData.option === 'yes') {
+        if (userResponseData.option === "yes") {
           updateOperations.$inc.yesCount = 1;
-        } else if (userResponseData.option === 'no') {
+        } else if (userResponseData.option === "no") {
           updateOperations.$inc.noCount = 1;
         }
-    
+
         // Increment response count and yes/no count for the corresponding survey
         const updateStatus = await surveyCollection.updateOne(
           { _id: new ObjectId(userResponseData.surveyId) },
           updateOperations
         );
-    
+
         // console.log(updateStatus);
         // console.log(result);
         res.send(result);
       } catch (error) {
         console.error("Error adding recommendation:", error);
-        res.status(500).send("Error adding recommendation. Please try again later.");
+        res
+          .status(500)
+          .send("Error adding recommendation. Please try again later.");
       }
     });
 
     // POST THE USER REPORT TO THE DB--------------------------
     app.post("/report-survey", async (req, res) => {
       const reportData = req.body;
-    
+
       try {
         // Insert the report data into the database
         const result = await reportsCollection.insertOne(reportData);
@@ -346,10 +349,18 @@ async function run() {
         res.status(500).send("Error reporting survey. Please try again later.");
       }
     });
-    
-    
 
-    // GET ALL THE responses FOR USER FROM DB FOR MY RECOMMENDATION PAGE
+      // GET ALL THE REPORTS FOR USER FROM DB FOR MY MY REPORTS PAGE
+      app.get("/user/my-reports/:email", async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const result = await reportsCollection.find(query).toArray();
+        res.send(result);
+      });
+
+
+
+    // GET ALL THE responses FOR USER FROM DB FOR MY RESPONSES PAGE
     app.get("/my-responses/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
@@ -357,7 +368,9 @@ async function run() {
       res.send(result);
     });
 
-    // -------------------------------------SURVEYOR
+    // ............................................. USER ENDS
+
+    // -------------------------------------SURVEYOR STARTS
     // POST THE SURVEY TO DB FROM CREATE SURVEY PAGE
     app.post("/surveys", async (req, res) => {
       try {
@@ -481,81 +494,83 @@ async function run() {
     //   }
     // });
 
-
-  
-  
     app.put("/update/survey/:id", async (req, res) => {
       const id = req.params.id;
-  
+
       // Validate ID format
       if (!ObjectId.isValid(id)) {
-          return res.status(400).send({ message: "Invalid ID format" });
+        return res.status(400).send({ message: "Invalid ID format" });
       }
-  
+
       const { title, description, category, deadline, questions } = req.body;
       // console.log('Received update request with data:', req.body);
-      
-  
+
       try {
-          // Fetch the existing survey data
-          const existingSurvey = await surveyCollection.findOne({ _id: new ObjectId(id) });
-          console.log('existing surevy----------',existingSurvey);
-          if (!existingSurvey) {
-              return res.status(404).send({ message: "Survey not found" });
-          }
-  
-          const updateFields = {};
-          
-  
-          // Check each field and update if new value is defined
-          updateFields.title = title || existingSurvey.title;
-          updateFields.description = description || existingSurvey.description;
-          updateFields.category = category || existingSurvey.category;
-          updateFields.deadline = deadline || existingSurvey.deadline;
-          
-          updateFields.questions = questions !== undefined ? 
-          existingSurvey.questions.map(existingQuestion => {
-              const updatedQuestion = questions.find(q => q.qId === existingQuestion.qId);
-              return updatedQuestion ? { ...existingQuestion, ...updatedQuestion } : existingQuestion;
-          }) : existingSurvey.questions;
-      
-          console.log('updatesfiled---------------',updateFields);
-          const result = await surveyCollection.updateOne(
-              { _id: new ObjectId(id) },
-              { $set: updateFields }
-          );
-  
-          console.log('result-----------------',result);
-          if (result.matchedCount === 0) {
-              return res.status(404).send({ message: "Survey not found" });
-          }
-  
-          res.send({ message: "Survey updated successfully" });
+        // Fetch the existing survey data
+        const existingSurvey = await surveyCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        console.log("existing surevy----------", existingSurvey);
+        if (!existingSurvey) {
+          return res.status(404).send({ message: "Survey not found" });
+        }
+
+        const updateFields = {};
+
+        // Check each field and update if new value is defined
+        updateFields.title = title || existingSurvey.title;
+        updateFields.description = description || existingSurvey.description;
+        updateFields.category = category || existingSurvey.category;
+        updateFields.deadline = deadline || existingSurvey.deadline;
+
+        updateFields.questions =
+          questions !== undefined
+            ? existingSurvey.questions.map((existingQuestion) => {
+                const updatedQuestion = questions.find(
+                  (q) => q.qId === existingQuestion.qId
+                );
+                return updatedQuestion
+                  ? { ...existingQuestion, ...updatedQuestion }
+                  : existingQuestion;
+              })
+            : existingSurvey.questions;
+
+        console.log("updatesfiled---------------", updateFields);
+        const result = await surveyCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updateFields }
+        );
+
+        console.log("result-----------------", result);
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: "Survey not found" });
+        }
+
+        res.send({ message: "Survey updated successfully" });
       } catch (error) {
-          // console.error("Error updating survey:", error);
-          res.status(500).send({ message: "Error updating survey. Please try again later." });
+        // console.error("Error updating survey:", error);
+        res
+          .status(500)
+          .send({ message: "Error updating survey. Please try again later." });
       }
-  });
+    });
+
+    // ..................................................SURVEYOR ENDS
 
 
-
-  // ------------------------------------PRO-USER
-// GET THE PRO-USER COMMENTS BY EMAIL FOR COMMENTS PAGE
-app.get("/pro-user/comments/:email", async (req, res) => {
-  const email = req.params.email;
-  const result = await usersResponseCollection.find({ email }).toArray(); 
-  console.log(result);
-  res.send(result);
-});
-
-  
+    // ------------------------------------PRO-USER STARTS
+    // GET THE PRO-USER COMMENTS BY EMAIL FOR COMMENTS PAGE
+    app.get("/pro-user/comments/:email", async (req, res) => {
+      const email = req.params.email;
+      const result = await usersResponseCollection.find({ email }).toArray();
+      console.log(result);
+      res.send(result);
+    });
 
 
-    
-    
-    
+    // ................................................PRO USER ENDS
 
-    // ----------------------------------STRIPE PAYMENT
+    // ----------------------------------STRIPE PAYMENT STARTS
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
       const priceInCent = parseFloat(price) * 100;
