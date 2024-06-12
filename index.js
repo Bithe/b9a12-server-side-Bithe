@@ -347,9 +347,6 @@ async function run() {
       }
     });
     
-
-
-    
     
 
     // GET ALL THE responses FOR USER FROM DB FOR MY RECOMMENDATION PAGE
@@ -539,11 +536,21 @@ async function run() {
           res.status(500).send({ message: "Error updating survey. Please try again later." });
       }
   });
+
+
+
+  // ------------------------------------PRO-USER
+// GET THE PRO-USER COMMENTS BY EMAIL FOR COMMENTS PAGE
+app.get("/pro-user/comments/:email", async (req, res) => {
+  const email = req.params.email;
+  const result = await usersResponseCollection.find({ email }).toArray(); 
+  console.log(result);
+  res.send(result);
+});
+
   
-  
-      
-    
-    
+
+
     
     
     
