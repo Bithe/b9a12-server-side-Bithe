@@ -124,6 +124,29 @@ async function run() {
         res.status(500).send("Internal Server Error");
       }
     });
+
+    // SURVEY RESULTS PAGE CHART
+    app.get("/survey-results/:id", async (req, res) => {
+      const surveyId = req.params.id;
+      try {
+        const survey = await surveyCollection.findOne({
+          _id: new ObjectId(surveyId),
+        });
+        const responses = await usersResponseCollection
+          .find({ surveyId })
+          .toArray();
+        const questions = survey.questions.map((question) => ({
+          ...question,
+          responses: responses.map((response) =>
+            response.responses.find((r) => r.questionId === question.qId)
+          ),
+        }));
+        res.send({ ...survey, questions });
+      } catch (error) {
+        res.status(500).send({ message: error.message });
+      }
+    });
+
     // ---------------------------------------------------HOME ENDS
 
     // ---------------------------------------------------SURVEYS PAGE STARTS
@@ -160,7 +183,7 @@ async function run() {
 
     // ---------------------------------------------------SURVEYS PAGE ENDS
 
-    // -------------------------------------ADMIN
+    // -------------------------------------ADMIN STARTS
 
     // SAVE USER
     app.put("/user", async (req, res) => {
@@ -271,7 +294,31 @@ async function run() {
       }
     });
 
-    //------------------------------------ADMIN END
+    // GET/SHOW ALL THE PAYMENTS FOR ALL PAYMENTS PAGE, ONLY THE PAYMENTS USER INFO
+    app.get("/dashboard/admin/payments", async (req, res) => {
+      try {
+        const payments = await usersCollection
+          .find({ role: "pro-user" })
+          .toArray();
+        res.status(200).json(payments);
+      } catch (error) {
+        console.error("Error fetching payments:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
+    // GET/SHOW ALL SURVEY RESPONSES
+    app.get("/dashboard/admin/survey-responses", async (req, res) => {
+      try {
+        const surveyResponses = await usersResponseCollection.find().toArray();
+        res.status(200).json(surveyResponses);
+      } catch (error) {
+        console.error("Error fetching survey responses:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
+    //------------------------------------ADMIN ENDS
 
     //------------------------------------USER
 
@@ -350,15 +397,13 @@ async function run() {
       }
     });
 
-      // GET ALL THE REPORTS FOR USER FROM DB FOR MY MY REPORTS PAGE
-      app.get("/user/my-reports/:email", async (req, res) => {
-        const email = req.params.email;
-        const query = { email: email };
-        const result = await reportsCollection.find(query).toArray();
-        res.send(result);
-      });
-
-
+    // GET ALL THE REPORTS FOR USER FROM DB FOR MY MY REPORTS PAGE
+    app.get("/user/my-reports/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await reportsCollection.find(query).toArray();
+      res.send(result);
+    });
 
     // GET ALL THE responses FOR USER FROM DB FOR MY RESPONSES PAGE
     app.get("/my-responses/:email", async (req, res) => {
@@ -450,6 +495,24 @@ async function run() {
       } catch (error) {
         console.error("Error fetching survey:", error);
         res.status(500).send("Error fetching survey");
+      }
+    });
+
+    // SURVEY RESPONSES---
+    // GET surveys added by the currently logged-in user
+
+
+    // GET individual survey responses for a specific survey
+    app.get("/dashboard/surveyor/surveys/:id", async (req, res) => {
+      const surveyId = req.params.id;
+      try {
+        const surveyResponses = await usersResponseCollection
+          .find({ surveyId })
+          .toArray();
+        res.status(200).json(surveyResponses);
+      } catch (error) {
+        console.error("Error fetching survey responses:", error);
+        res.status(500).send("Internal Server Error");
       }
     });
 
@@ -557,7 +620,6 @@ async function run() {
 
     // ..................................................SURVEYOR ENDS
 
-
     // ------------------------------------PRO-USER STARTS
     // GET THE PRO-USER COMMENTS BY EMAIL FOR COMMENTS PAGE
     app.get("/pro-user/comments/:email", async (req, res) => {
@@ -566,7 +628,6 @@ async function run() {
       console.log(result);
       res.send(result);
     });
-
 
     // ................................................PRO USER ENDS
 
@@ -593,33 +654,36 @@ async function run() {
     });
 
     app.put("/payment/pro-user", async (req, res) => {
-      const user = req.body;
-      const query = { email: user?.email };
+      const { email, price, transactionId, status, role } = req.body;
+      const query = { email };
 
-      const isExist = await usersCollection.findOne(query);
-      if (isExist) {
-        if (user.status === "Requested") {
-          const result = await usersCollection.updateOne(query, {
-            $set: { status: user?.status },
-          });
-          return res.send(result);
-        } else {
-          return res.send(isExist);
-        }
-      } else {
-        const options = { upsert: true };
+      try {
+        const isExist = await usersCollection.findOne(query);
         const updateDoc = {
           $set: {
-            ...user,
+            price,
+            transactionId,
+            status,
+            role,
             timestamp: Date.now(),
           },
         };
-        const result = await usersCollection.updateOne(
-          query,
-          updateDoc,
-          options
-        );
-        res.send(result);
+
+        if (isExist) {
+          const result = await usersCollection.updateOne(query, updateDoc);
+          return res.send(result);
+        } else {
+          const options = { upsert: true };
+          const result = await usersCollection.updateOne(
+            query,
+            updateDoc,
+            options
+          );
+          return res.send(result);
+        }
+      } catch (error) {
+        console.error("Error updating user payment info:", error);
+        res.status(500).send("Internal Server Error");
       }
     });
 
