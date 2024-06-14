@@ -320,27 +320,38 @@ async function run() {
 
     //------------------------------------ADMIN ENDS
 
-    //------------------------------------USER
+    //------------------------------------USER STARTS
 
     // POST THE USER RESPONSE TO THE DB FOR THAT SURVEY
 
+    
+
+    // -----------
     // app.post("/user-response", async (req, res) => {
     //   const userResponseData = req.body;
 
     //   try {
-    //     // Insert the recommendation data into the database
+    //     // Insert the user response data into the database
     //     const result = await usersResponseCollection.insertOne(
     //       userResponseData
     //     );
 
-    //     // Increment recommendation count for the corresponding query
+    //     // Construct the update operations based on the user's response
+    //     const updateOperations = { $inc: { responseCount: 1 } };
+    //     if (userResponseData.option === "yes") {
+    //       updateOperations.$inc.yesCount = 1;
+    //     } else if (userResponseData.option === "no") {
+    //       updateOperations.$inc.noCount = 1;
+    //     }
+
+    //     // Increment response count and yes/no count for the corresponding survey
     //     const updateStatus = await surveyCollection.updateOne(
     //       { _id: new ObjectId(userResponseData.surveyId) },
-    //       { $inc: { responseCount: 1 } }
+    //       updateOperations
     //     );
-    //     console.log(updateStatus);
 
-    //     console.log(result);
+    //     // console.log(updateStatus);
+    //     // console.log(result);
     //     res.send(result);
     //   } catch (error) {
     //     console.error("Error adding recommendation:", error);
@@ -351,37 +362,32 @@ async function run() {
     // });
     app.post("/user-response", async (req, res) => {
       const userResponseData = req.body;
-
+    
       try {
         // Insert the user response data into the database
-        const result = await usersResponseCollection.insertOne(
-          userResponseData
-        );
-
-        // Construct the update operations based on the user's response
-        const updateOperations = { $inc: { responseCount: 1 } };
-        if (userResponseData.option === "yes") {
-          updateOperations.$inc.yesCount = 1;
-        } else if (userResponseData.option === "no") {
-          updateOperations.$inc.noCount = 1;
+        const result = await usersResponseCollection.insertOne(userResponseData);
+    
+        // Iterate over each response to update the yes/no counts for corresponding questions
+        for (const response of userResponseData.responses) {
+          const fieldToUpdate = response.option === "yes" ? "questions.$.yesCount" : "questions.$.noCount";
+          const updateOperations = { $inc: { [fieldToUpdate]: 1, responseCount: 1 } };
+    
+          // Increment the respective yes/no count for each question
+          await surveyCollection.updateOne(
+            { _id: new ObjectId(userResponseData.surveyId), "questions.qId": response.questionId },
+            updateOperations
+          );
         }
-
-        // Increment response count and yes/no count for the corresponding survey
-        const updateStatus = await surveyCollection.updateOne(
-          { _id: new ObjectId(userResponseData.surveyId) },
-          updateOperations
-        );
-
-        // console.log(updateStatus);
-        // console.log(result);
+    
         res.send(result);
       } catch (error) {
         console.error("Error adding recommendation:", error);
-        res
-          .status(500)
-          .send("Error adding recommendation. Please try again later.");
+        res.status(500).send("Error adding recommendation. Please try again later.");
       }
     });
+    
+
+    // ..........
 
     // POST THE USER REPORT TO THE DB--------------------------
     app.post("/report-survey", async (req, res) => {
