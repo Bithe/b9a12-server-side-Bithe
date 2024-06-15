@@ -562,7 +562,7 @@ async function run() {
     //       .send({ message: "Error updating query. Please try again later." });
     //   }
     // });
-
+// ------.......
     app.put("/update/survey/:id", async (req, res) => {
       const id = req.params.id;
 
@@ -623,6 +623,7 @@ async function run() {
           .send({ message: "Error updating survey. Please try again later." });
       }
     });
+    // ........
 
     // ..................................................SURVEYOR ENDS
 
