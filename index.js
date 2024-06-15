@@ -324,8 +324,6 @@ async function run() {
 
     // POST THE USER RESPONSE TO THE DB FOR THAT SURVEY
 
-    
-
     // -----------
     // app.post("/user-response", async (req, res) => {
     //   const userResponseData = req.body;
@@ -362,30 +360,41 @@ async function run() {
     // });
     app.post("/user-response", async (req, res) => {
       const userResponseData = req.body;
-    
+
       try {
         // Insert the user response data into the database
-        const result = await usersResponseCollection.insertOne(userResponseData);
-    
+        const result = await usersResponseCollection.insertOne(
+          userResponseData
+        );
+
         // Iterate over each response to update the yes/no counts for corresponding questions
         for (const response of userResponseData.responses) {
-          const fieldToUpdate = response.option === "yes" ? "questions.$.yesCount" : "questions.$.noCount";
-          const updateOperations = { $inc: { [fieldToUpdate]: 1, responseCount: 1 } };
-    
+          const fieldToUpdate =
+            response.option === "yes"
+              ? "questions.$.yesCount"
+              : "questions.$.noCount";
+          const updateOperations = {
+            $inc: { [fieldToUpdate]: 1, responseCount: 1 },
+          };
+
           // Increment the respective yes/no count for each question
           await surveyCollection.updateOne(
-            { _id: new ObjectId(userResponseData.surveyId), "questions.qId": response.questionId },
+            {
+              _id: new ObjectId(userResponseData.surveyId),
+              "questions.qId": response.questionId,
+            },
             updateOperations
           );
         }
-    
+
         res.send(result);
       } catch (error) {
         console.error("Error adding recommendation:", error);
-        res.status(500).send("Error adding recommendation. Please try again later.");
+        res
+          .status(500)
+          .send("Error adding recommendation. Please try again later.");
       }
     });
-    
 
     // ..........
 
@@ -507,7 +516,6 @@ async function run() {
     // SURVEY RESPONSES---
     // GET surveys added by the currently logged-in user
 
-
     // GET individual survey responses for a specific survey
     app.get("/dashboard/surveyor/surveys/:id", async (req, res) => {
       const surveyId = req.params.id;
@@ -536,33 +544,8 @@ async function run() {
     // ----------------------------  SURVEY UPDATE
 
     // UPDATE A SINGLE SURVEY TO SERVER
-    // app.put("/survey/question/:qId", async (req, res) => {
-    //   const qId = req.params.qId;
-    //   const filter = { "questions.qId": qId };
-    //   const updatedQuery = req.body; // Updated fields from the request body
 
-    //   // Define the update query with the fields to be updated
-    //   const updateQuery = {
-    //     $set: {
-    //       "questions.$.title": updatedQuery.title,
-    //       "questions.$.description": updatedQuery.description,
-    //       "questions.$.category": updatedQuery.category,
-    //       "questions.$.deadline": updatedQuery.deadline,
-    //     },
-    //   };
-
-    //   try {
-    //     // Update the survey document matching the filter
-    //     const result = await surveyCollection.updateOne(filter, updateQuery);
-    //     res.send(result);
-    //   } catch (error) {
-    //     console.error("Error updating query:", error);
-    //     res
-    //       .status(500)
-    //       .send({ message: "Error updating query. Please try again later." });
-    //   }
-    // });
-// ------.......
+    // ------.......
     app.put("/update/survey/:id", async (req, res) => {
       const id = req.params.id;
 
