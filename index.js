@@ -264,17 +264,49 @@ async function run() {
     });
 
     // UPDATE A SURVEY STATUS BY ADMIN
+    // -----
+    // app.patch("/admin/survey/update/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   if (!ObjectId.isValid(id)) {
+    //     return res.status(400).send("Invalid survey ID");
+    //   }
+    //   const filter = { _id: new ObjectId(id) };
+    //   const status = req.body.status;
+
+    //   try {
+    //     const updateDoc = {
+    //       $set: { status },
+    //     };
+
+    //     const result = await surveyCollection.updateOne(filter, updateDoc);
+
+    //     console.log("Update result:", result);
+
+    //     if (result.modifiedCount === 1) {
+    //       res.status(200).send("Survey status updated successfully");
+    //     } else {
+    //       res
+    //         .status(404)
+    //         .send("No documents matched the query. Updated 0 documents.");
+    //     }
+    //   } catch (error) {
+    //     console.error("Error updating survey status:", error);
+    //     res.status(500).send("Error updating survey status");
+    //   }
+    // });
+    // Assuming you are using MongoDB and Mongoose
+
     app.patch("/admin/survey/update/:id", async (req, res) => {
       const id = req.params.id;
       if (!ObjectId.isValid(id)) {
         return res.status(400).send("Invalid survey ID");
       }
       const filter = { _id: new ObjectId(id) };
-      const status = req.body.status;
+      const { status, feedback } = req.body; // Extract status and feedback from request body
 
       try {
         const updateDoc = {
-          $set: { status },
+          $set: { status, feedback }, // Update status and feedback
         };
 
         const result = await surveyCollection.updateOne(filter, updateDoc);
@@ -293,6 +325,8 @@ async function run() {
         res.status(500).send("Error updating survey status");
       }
     });
+
+    // ----.....
 
     // GET/SHOW ALL THE PAYMENTS FOR ALL PAYMENTS PAGE, ONLY THE PAYMENTS USER INFO
     app.get("/dashboard/admin/payments", async (req, res) => {
@@ -527,6 +561,20 @@ async function run() {
       } catch (error) {
         console.error("Error fetching survey responses:", error);
         res.status(500).send("Internal Server Error");
+      }
+    });
+
+    // GET THE FEEDBACK FOR THIS SURVEYOUR UNPUBLISHED SURVEY BY ADMIN
+    app.get("/dashboard/surveyor/feedbacks/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { "surveyor.email": email, status: "unpublish" }; // Combine both conditions
+
+      try {
+        const feedbacks = await surveyCollection.find(query).toArray();
+        res.json(feedbacks);
+      } catch (error) {
+        console.error("Error fetching unpublished surveys:", error);
+        res.status(500).json({ message: "Internal server error" });
       }
     });
 
