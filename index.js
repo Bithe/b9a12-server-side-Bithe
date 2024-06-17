@@ -3,7 +3,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-// const jwt = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 // const cookieParser = require("cookie-parser");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -25,7 +25,6 @@ const corsConfig = {
     "https://y-bithes-projects.vercel.app",
     "https://zendesk-survey-client.web.app",
     "https://zendesk-survey-client.firebaseapp.com",
-
   ],
   credentials: true,
 };
@@ -75,23 +74,44 @@ async function run() {
       .collection("reportsCollection");
 
     // JWT GENERATOR
-    app.post("/jwt", async (req, res) => {
+    // app.post("/jwt", async (req, res) => {
+    //   const user = req.body;
+    //   console.log("I need a new jwt", user);
+    //   const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+    //     expiresIn: "365d",
+    //   });
+    //   res.cookie("token", token, cookieOptions).send({ success: true });
+    // });
+    app.post('/jwt', async (req, res) => {
       const user = req.body;
-      console.log("I need a new jwt", user);
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "365d",
-      });
-      res.cookie("token", token, cookieOptions).send({ success: true });
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+      res.send({ token });
     });
-
+    const verifyToken = (req, res, next) => {
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'unauthorized access' });
+      }
+      const token = req.headers.authorization.split(' ')[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: 'unauthorized access' });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
+    
+    
     //clearing Token
     app.post("/logout", async (req, res) => {
       const user = req.body;
-      console.log("logging out", user);
+      // console.log("logging out", user);
       res
         .clearCookie("token", { ...cookieOptions, maxAge: 0 })
         .send({ success: true });
     });
+   
+    
 
     // DATA
     // ---------------------------------------------------HOME STARTS
@@ -101,9 +121,9 @@ async function run() {
       try {
         const query = { status: "publish" };
         const result = await surveyCollection.find(query).toArray();
-        console.log("Fetched Surveys:", result); // Log fetched data
+        // console.log("Fetched Surveys:", result); 
         const reversedResult = result.reverse();
-        console.log(reversedResult);
+        // console.log(reversedResult);
 
         res.send(reversedResult);
       } catch (error) {
@@ -178,7 +198,7 @@ async function run() {
         // Reverse the results to get the latest surveys first
         const reversedResult = result;
 
-        console.log("Fetched Surveys:", reversedResult);
+        // console.log("Fetched Surveys:", reversedResult);
         res.send(reversedResult);
       } catch (error) {
         console.error("Error fetching recent surveys:", error);
@@ -222,7 +242,8 @@ async function run() {
     });
 
     // ALL USERS FROM DB
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
+      console.log('for token----------------',req.headers);
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
@@ -253,7 +274,7 @@ async function run() {
 
         const result = await usersCollection.updateOne(query, updateDoc);
 
-        console.log("Update result:", result);
+        // console.log("Update result:", result);
 
         if (result.modifiedCount === 1) {
           res.status(200).send("User role updated successfully");
@@ -299,7 +320,6 @@ async function run() {
     //     res.status(500).send("Error updating survey status");
     //   }
     // });
-    // Assuming you are using MongoDB and Mongoose
 
     app.patch("/admin/survey/update/:id", async (req, res) => {
       const id = req.params.id;
@@ -307,11 +327,11 @@ async function run() {
         return res.status(400).send("Invalid survey ID");
       }
       const filter = { _id: new ObjectId(id) };
-      const { status, feedback } = req.body; // Extract status and feedback from request body
+      const { status, feedback } = req.body;
 
       try {
         const updateDoc = {
-          $set: { status, feedback }, // Update status and feedback
+          $set: { status, feedback },
         };
 
         const result = await surveyCollection.updateOne(filter, updateDoc);
@@ -364,49 +384,15 @@ async function run() {
     // POST THE USER RESPONSE TO THE DB FOR THAT SURVEY
 
     // -----------
-    // app.post("/user-response", async (req, res) => {
-    //   const userResponseData = req.body;
 
-    //   try {
-    //     // Insert the user response data into the database
-    //     const result = await usersResponseCollection.insertOne(
-    //       userResponseData
-    //     );
-
-    //     // Construct the update operations based on the user's response
-    //     const updateOperations = { $inc: { responseCount: 1 } };
-    //     if (userResponseData.option === "yes") {
-    //       updateOperations.$inc.yesCount = 1;
-    //     } else if (userResponseData.option === "no") {
-    //       updateOperations.$inc.noCount = 1;
-    //     }
-
-    //     // Increment response count and yes/no count for the corresponding survey
-    //     const updateStatus = await surveyCollection.updateOne(
-    //       { _id: new ObjectId(userResponseData.surveyId) },
-    //       updateOperations
-    //     );
-
-    //     // console.log(updateStatus);
-    //     // console.log(result);
-    //     res.send(result);
-    //   } catch (error) {
-    //     console.error("Error adding recommendation:", error);
-    //     res
-    //       .status(500)
-    //       .send("Error adding recommendation. Please try again later.");
-    //   }
-    // });
     app.post("/user-response", async (req, res) => {
       const userResponseData = req.body;
 
       try {
-        // Insert the user response data into the database
         const result = await usersResponseCollection.insertOne(
           userResponseData
         );
 
-        // Iterate over each response to update the yes/no counts for corresponding questions
         for (const response of userResponseData.responses) {
           const fieldToUpdate =
             response.option === "yes"
@@ -416,7 +402,6 @@ async function run() {
             $inc: { [fieldToUpdate]: 1, responseCount: 1 },
           };
 
-          // Increment the respective yes/no count for each question
           await surveyCollection.updateOne(
             {
               _id: new ObjectId(userResponseData.surveyId),
@@ -425,6 +410,10 @@ async function run() {
             updateOperations
           );
         }
+        await surveyCollection.updateOne(
+          { _id: new ObjectId(userResponseData.surveyId) },
+          { $inc: { vote: 1 } }
+        );
 
         res.send(result);
       } catch (error) {
@@ -615,7 +604,7 @@ async function run() {
         const existingSurvey = await surveyCollection.findOne({
           _id: new ObjectId(id),
         });
-        console.log("existing surevy----------", existingSurvey);
+        // console.log("existing surevy----------", existingSurvey);
         if (!existingSurvey) {
           return res.status(404).send({ message: "Survey not found" });
         }
@@ -646,7 +635,7 @@ async function run() {
           { $set: updateFields }
         );
 
-        console.log("result-----------------", result);
+        // console.log("result-----------------", result);
         if (result.matchedCount === 0) {
           return res.status(404).send({ message: "Survey not found" });
         }
@@ -668,7 +657,7 @@ async function run() {
     app.get("/pro-user/comments/:email", async (req, res) => {
       const email = req.params.email;
       const result = await usersResponseCollection.find({ email }).toArray();
-      console.log(result);
+      // console.log(result);
       res.send(result);
     });
 
