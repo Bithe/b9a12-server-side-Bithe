@@ -21,10 +21,9 @@ const corsConfig = {
     "http://localhost:5174",
     "http://localhost:5173",
     "http://localhost:5175",
-    "https://y-pi-opal.vercel.app",
-    "https://y-bithes-projects.vercel.app",
-    "https://zendesk-survey-client.web.app",
-    "https://zendesk-survey-client.firebaseapp.com",
+   
+    "https://easy-bookings-server-3yx66f4nv-bithes-projects.vercel.app",
+    "https://easy-bookings-server.vercel.app"
   ],
   credentials: true,
 };
